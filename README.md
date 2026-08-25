@@ -1,122 +1,87 @@
-# PX4 + MAVROS + ROS 2 Drone Simulation Project
+# Pi-Drone: ROS 2 Offboard-Control Prototype
 
-This repository contains a ROS 2 package used to control a PX4 simulated drone through MAVROS.
-It was developed for a project based on a PX4 + Gazebo x500 simulation environment running on Ubuntu 22.04.
+A ROS 2 and PX4 simulation project for testing programmatic drone control, telemetry, and the transition into OFFBOARD flight mode before moving toward Raspberry Pi-based deployment.
 
-## Project Overview
+## Motivation
 
-The goal of this project is to connect:
+Autonomous inspection and robotics projects need a safe way to validate control logic before hardware flight. Pi-Drone uses PX4 software-in-the-loop simulation and Gazebo to test command timing, middleware integration, and flight-state behaviour in a controlled environment.
 
-- **PX4 SITL** as the flight controller
-- **Gazebo** as the simulation environment
-- **MAVROS** as the bridge between PX4 and ROS 2
-- **ROS 2 Humble** as the control framework
+## Goals
 
-A custom ROS 2 Python node publishes OFFBOARD control setpoints to the drone and attempts to support takeoff behavior.
+- Connect ROS 2 applications to PX4 through MAVROS and MAVLink.
+- Stream setpoints at a rate suitable for OFFBOARD control.
+- Test a simple takeoff, hover, and idle sequence in simulation.
+- Inspect telemetry and sensor topics during preflight debugging.
+- Build a foundation for companion-computer deployment on Raspberry Pi.
 
-## Repository Structure
+## Work completed
+
+- Created a ROS 2 package for offboard-control experiments.
+- Published `TwistStamped` velocity setpoints at **20 Hz**.
+- Implemented timed takeoff, hover, and idle phases.
+- Exercised PX4 SITL, Gazebo, ROS 2 Humble, MAVROS, and MAVLink integration.
+- Investigated EKF and preflight checks that blocked arming during simulation.
+
+## Control flow
 
 ```text
-pidrone_project/
-├── README.md
+ROS 2 node → MAVROS → MAVLink → PX4 SITL → Gazebo vehicle
+     ↑                                      │
+     └──────────── telemetry and state ─────┘
+```
+
+## Technology
+
+- ROS 2 Humble
+- PX4 Autopilot / SITL
+- Gazebo
+- MAVROS and MAVLink
+- Python
+- Raspberry Pi as the intended companion-computer target
+
+## Repository structure
+
+```text
+Pi-Drone/
 ├── package.xml
 ├── setup.py
-├── setup.cfg
-├── launch/
-│   └── pidrone_offboard.launch.py
-├── pidrone_control/
-│   ├── __init__.py
-│   └── move_drone.py
 ├── resource/
-│   └── pidrone_control
-└── docs/
-    └── run_commands.md
+└── pi_drone/
+    └── offboard_control.py
 ```
 
-## Requirements
+## Build and run
 
-- Ubuntu 22.04
-- ROS 2 Humble
-- PX4 Autopilot
-- Gazebo
-- MAVROS and MAVROS extras
-
-Install MAVROS:
-
-```bash
-sudo apt update
-sudo apt install ros-humble-mavros ros-humble-mavros-extras geographiclib-tools
-sudo geographiclib-get-geoids egm96-5
-```
-
-## Build
-
-Create a ROS 2 workspace and place this repository inside the `src` folder.
+Prerequisites include a working ROS 2 Humble workspace, PX4 SITL, Gazebo, and MAVROS.
 
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws/src
-# clone this repo here
-cd ~/ros2_ws
-source /opt/ros/humble/setup.bash
-colcon build
+git clone https://github.com/sajeda1311/Pi-Drone.git
+cd ..
+colcon build --symlink-install
 source install/setup.bash
 ```
 
-## Run Procedure
+Start PX4 SITL, Gazebo, and the MAVROS bridge using the configuration appropriate to your environment. Then run the package entry point defined in `setup.py`.
 
-### 1. Start PX4 SITL
+## Accomplishments
 
-```bash
-cd ~/PX4-Autopilot
-make px4_sitl gz_x500
-```
+- Established the ROS 2-to-PX4 command path in simulation.
+- Maintained the continuous setpoint stream required by OFFBOARD mode.
+- Used telemetry and sensor streams to diagnose system readiness instead of treating arming failures as application-only bugs.
+- Created a reusable base for future autonomous inspection behaviours.
 
-### 2. Start MAVROS
+## Current status
 
-```bash
-source /opt/ros/humble/setup.bash
-ros2 launch mavros px4.launch.py fcu_url:=udp://:14540@127.0.0.1:14557
-```
+The node publishes OFFBOARD setpoints, but PX4 arming remained blocked by EKF2/preflight readiness during the documented tests. The repository represents active simulation and integration work; it does not claim a completed autonomous flight or hardware deployment.
 
-If your MAVROS installation only provides `px4.launch`, check your distro-specific MAVROS package and adapt the command accordingly.
+## Next goals
 
-### 3. Run the control node
+- Add explicit vehicle-state checks before changing mode or arming.
+- Resolve the EKF/preflight simulation configuration and document the fix.
+- Add position or trajectory setpoints with a formal state machine.
+- Include launch files, parameter files, and repeatable SITL commands.
+- Add safety timeouts, geofencing, and command-loss handling.
+- Validate the same interface on a Raspberry Pi companion computer.
 
-```bash
-source /opt/ros/humble/setup.bash
-cd ~/ros2_ws
-source install/setup.bash
-ros2 run pidrone_control move_drone
-```
-
-### 4. Set OFFBOARD mode
-
-```bash
-ros2 service call /mavros/set_mode mavros_msgs/srv/SetMode "{base_mode: 0, custom_mode: 'OFFBOARD'}"
-```
-
-### 5. Arm the drone
-
-```bash
-ros2 service call /mavros/cmd/arming mavros_msgs/srv/CommandBool "{value: true}"
-```
-
-## Important Note
-
-In the original project work, the node successfully published setpoints and OFFBOARD mode could be requested,
-but the drone could not arm consistently because PX4 reported preflight health check / EKF2 related issues.
-
-So this repository reflects the **implementation developed for the project**, but successful flight may still
-depend on resolving PX4 EKF2 / arming configuration in the simulation environment.
-
-## Main Topics Used
-
-- `/mavros/state`
-- `/mavros/local_position/pose`
-- `/mavros/setpoint_velocity/cmd_vel`
-- `/mavros/setpoint_position/local`
-
-## License
-
-This project is provided for academic use.
